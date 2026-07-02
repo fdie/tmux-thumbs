@@ -8,7 +8,29 @@ use termion::raw::IntoRawMode;
 use termion::screen::AlternateScreen;
 use termion::{color, cursor};
 
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+
+// Matches tmux's default `tab-stop` setting, used by capture-pane output
+// (tabs are preserved verbatim rather than expanded to spaces).
+const TAB_STOP: usize = 8;
+
+// unicode-width reports 0/None width for '\t' since a tab's rendered width
+// depends on the current column, not the character itself. Expand it to the
+// next tab stop so prefix widths (and therefore hint offsets) stay accurate
+// on lines that contain literal tabs, e.g. `git status` file listings.
+fn display_width(text: &str) -> usize {
+  let mut col = 0;
+
+  for ch in text.chars() {
+    if ch == '\t' {
+      col += TAB_STOP - (col % TAB_STOP);
+    } else {
+      col += ch.width_cjk().unwrap_or(0);
+    }
+  }
+
+  col
+}
 
 pub struct View<'a> {
   state: &'a mut state::State<'a>,
@@ -123,11 +145,13 @@ impl<'a> View<'a> {
         &self.background_color
       };
 
-      // Find long utf sequences and extract it from mat.x
+      // mat.x is a byte offset (from the regex match); convert it to a
+      // display-column offset so wide (CJK/emoji) and narrow multi-byte
+      // (accented letters, powerline glyphs, etc.) characters are handled
+      // consistently.
       let line = &self.state.lines[mat.y as usize];
       let prefix = &line[0..mat.x as usize];
-      let extra = prefix.width_cjk() - prefix.chars().count();
-      let offset = (mat.x as u16) - (extra as u16);
+      let offset = display_width(prefix) as u16;
       let text = self.make_hint_text(mat.text);
 
       print!(
@@ -345,5 +369,21 @@ mod tests {
     view.contrast = true;
     let result = view.make_hint_text("a");
     assert_eq!(result, "[a]".to_string());
+  }
+
+  #[test]
+  fn tab_prefix_offset() {
+    let lines = split("\tscripts/xmpp");
+    let custom = [].to_vec();
+    let state = state::State::new(&lines, "abcd", &custom);
+    let matches = state.matches(false, false);
+    let mat = matches.iter().find(|m| m.text == "scripts/xmpp").expect("match not found");
+    let line = &lines[mat.y as usize];
+    let prefix = &line[0..mat.x as usize];
+
+    // A tab at column 0 must expand to the next tab stop (column 8), not be
+    // treated as zero-width, so the hint lands on "scripts/xmpp" instead of
+    // over the leading whitespace.
+    assert_eq!(display_width(prefix), 8);
   }
 }
