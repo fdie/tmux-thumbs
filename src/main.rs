@@ -37,7 +37,7 @@ fn app_args<'a>() -> clap::ArgMatches<'a> {
     )
     .arg(
       Arg::with_name("format")
-        .help("Specifies the out format for the picked hint. (%U: Upcase, %H: Hint)")
+        .help("Specifies the out format for the picked hint. (%U: Upcase, %P: Pattern, %H: Hint)")
         .long("format")
         .short("f")
         .default_value("%H"),
@@ -124,6 +124,12 @@ fn app_args<'a>() -> clap::ArgMatches<'a> {
         .multiple(true),
     )
     .arg(
+      Arg::with_name("cursor_word_regexp")
+        .help("Use this regexp to match words related to the word before the cursor, tagged distinctly (%P) from --regexp matches")
+        .long("cursor-word-regexp")
+        .takes_value(true),
+    )
+    .arg(
       Arg::with_name("contrast")
         .help("Put square brackets around hint for visibility")
         .long("contrast")
@@ -154,6 +160,7 @@ fn main() {
   } else {
     [].to_vec()
   };
+  let cursor_word_regexp = args.value_of("cursor_word_regexp");
 
   let foreground_color = colors::get_color(args.value_of("foreground_color").unwrap());
   let background_color = colors::get_color(args.value_of("background_color").unwrap());
@@ -172,7 +179,7 @@ fn main() {
 
   let lines = output.split('\n').collect::<Vec<&str>>();
 
-  let mut state = state::State::new(&lines, alphabet, &regexp);
+  let mut state = state::State::new(&lines, alphabet, &regexp, cursor_word_regexp);
 
   let selected = {
     let mut viewbox = view::View::new(
@@ -198,12 +205,13 @@ fn main() {
   if !selected.is_empty() {
     let output = selected
       .iter()
-      .map(|(text, upcase)| {
+      .map(|(text, upcase, pattern)| {
         let upcase_value = if *upcase { "true" } else { "false" };
 
         let mut output = format.to_string();
 
         output = str::replace(&output, "%U", upcase_value);
+        output = str::replace(&output, "%P", pattern.as_str());
         output = str::replace(&output, "%H", text.as_str());
         output
       })

@@ -12,12 +12,20 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 // Matches tmux's default `tab-stop` setting, used by capture-pane output
 // (tabs are preserved verbatim rather than expanded to spaces).
+// Keep in sync with the TAB_STOP in swapper.rs (duplicated there since each
+// [[bin]] in this crate is its own crate root).
 const TAB_STOP: usize = 8;
 
 // unicode-width reports 0/None width for '\t' since a tab's rendered width
 // depends on the current column, not the character itself. Expand it to the
 // next tab stop so prefix widths (and therefore hint offsets) stay accurate
 // on lines that contain literal tabs, e.g. `git status` file listings.
+//
+// Uses width() rather than width_cjk(): width_cjk() treats Unicode
+// "Ambiguous"-category characters (which includes the Private-Use-Area glyphs
+// used by Nerd Font / Powerline prompt themes) as double-width, but real
+// terminals (and tmux) render them single-width unless in a CJK locale.
+// width() matches that common-case rendering.
 fn display_width(text: &str) -> usize {
   let mut col = 0;
 
@@ -25,7 +33,7 @@ fn display_width(text: &str) -> usize {
     if ch == '\t' {
       col += TAB_STOP - (col % TAB_STOP);
     } else {
-      col += ch.width_cjk().unwrap_or(0);
+      col += ch.width().unwrap_or(0);
     }
   }
 
@@ -47,7 +55,7 @@ pub struct View<'a> {
   background_color: Box<dyn color::Color>,
   hint_background_color: Box<dyn color::Color>,
   hint_foreground_color: Box<dyn color::Color>,
-  chosen: Vec<(String, bool)>,
+  chosen: Vec<(String, bool, String)>,
 }
 
 enum CaptureEvent {
@@ -128,7 +136,7 @@ impl<'a> View<'a> {
     let selected = self.matches.get(self.skip);
 
     for mat in self.matches.iter() {
-      let chosen_hint = self.chosen.iter().any(|(hint, _)| hint == mat.text);
+      let chosen_hint = self.chosen.iter().any(|(hint, _, _)| hint == mat.text);
 
       let selected_color = if chosen_hint {
         &self.multi_foreground_color
@@ -166,9 +174,9 @@ impl<'a> View<'a> {
 
       if let Some(ref hint) = mat.hint {
         let extra_position = match self.position {
-          "right" => text.width_cjk() - hint.len(),
+          "right" => text.width() - hint.len(),
           "off_left" => 0 - hint.len() - if self.contrast { 2 } else { 0 },
-          "off_right" => text.width_cjk(),
+          "off_right" => text.width(),
           _ => 0,
         };
 
@@ -250,7 +258,9 @@ impl<'a> View<'a> {
                   match ch {
                     '\n' => match self.matches.iter().enumerate().find(|&h| h.0 == self.skip) {
                       Some(hm) => {
-                        self.chosen.push((hm.1.text.to_string(), false));
+                        self
+                          .chosen
+                          .push((hm.1.text.to_string(), false, hm.1.pattern.to_string()));
 
                         if !self.multi {
                           return CaptureEvent::Hint;
@@ -277,7 +287,9 @@ impl<'a> View<'a> {
 
                       match selection {
                         Some(mat) => {
-                          self.chosen.push((mat.text.to_string(), key != lower_key));
+                          self
+                            .chosen
+                            .push((mat.text.to_string(), key != lower_key, mat.pattern.to_string()));
 
                           if self.multi {
                             typed_hint.clear();
@@ -317,7 +329,7 @@ impl<'a> View<'a> {
     CaptureEvent::Exit
   }
 
-  pub fn present(&mut self) -> Vec<(String, bool)> {
+  pub fn present(&mut self) -> Vec<(String, bool, String)> {
     let mut stdin = async_stdin();
     let mut stdout = AlternateScreen::from(stdout().into_raw_mode().unwrap());
 
@@ -344,7 +356,7 @@ mod tests {
   fn hint_text() {
     let lines = split("lorem 127.0.0.1 lorem");
     let custom = [].to_vec();
-    let mut state = state::State::new(&lines, "abcd", &custom);
+    let mut state = state::State::new(&lines, "abcd", &custom, None);
     let mut view = View {
       state: &mut state,
       skip: 0,
@@ -375,7 +387,7 @@ mod tests {
   fn tab_prefix_offset() {
     let lines = split("\tscripts/xmpp");
     let custom = [].to_vec();
-    let state = state::State::new(&lines, "abcd", &custom);
+    let state = state::State::new(&lines, "abcd", &custom, None);
     let matches = state.matches(false, false);
     let mat = matches.iter().find(|m| m.text == "scripts/xmpp").expect("match not found");
     let line = &lines[mat.y as usize];
@@ -385,5 +397,14 @@ mod tests {
     // treated as zero-width, so the hint lands on "scripts/xmpp" instead of
     // over the leading whitespace.
     assert_eq!(display_width(prefix), 8);
+  }
+
+  #[test]
+  fn display_width_treats_powerline_glyphs_as_narrow() {
+    // U+E0B0 is a Private-Use-Area glyph (Nerd Font / Powerline prompt
+    // separator). Real terminals render it single-width; width_cjk() would
+    // wrongly count it double-width (Ambiguous category), shifting every
+    // hint one column to the right on themed prompt lines.
+    assert_eq!(display_width("\u{e0b0} "), 2);
   }
 }

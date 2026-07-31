@@ -106,6 +106,7 @@ NOTE: for changes to take effect, you'll need to source again your `.tmux.conf` 
 * [@thumbs-multi-bg-color](#thumbs-multi-bg-color)
 * [@thumbs-contrast](#thumbs-contrast)
 * [@thumbs-osc52](#thumbs-osc52)
+* [@thumbs-cursor-word](#thumbs-cursor-word)
 
 ### @thumbs-key
 
@@ -344,6 +345,26 @@ For example:
 set -g @thumbs-osc52 1
 ```
 
+### @thumbs-cursor-word
+
+`default: disabled`
+
+Choose if you want `tmux-thumbs` to also hint blank-delimited tokens (paths,
+URLs, flags, etc., not just alphanumeric words) containing the token
+immediately before your cursor when it's activated. Only applies when the pane
+is not in copy-mode.
+
+When you pick one of these cursor-word matches with an upcase hint (the
+[auto paste](#extra-features) behavior), `tmux-thumbs` deletes the word before
+the cursor first, so the pasted match replaces what you were typing instead of
+being appended after it.
+
+For example:
+
+```
+set -g @thumbs-cursor-word enabled
+```
+
 #### Colors
 
 This is the list of predefined colors:
@@ -450,9 +471,12 @@ FLAGS:
 OPTIONS:
     -a, --alphabet <alphabet>                          Sets the alphabet [default: qwerty]
         --bg-color <background_color>                  Sets the background color for matches [default: black]
+        --cursor-word-regexp <cursor_word_regexp>
+            Use this regexp to match words related to the word before the cursor, tagged distinctly (%P) from --regexp
+            matches
         --fg-color <foreground_color>                  Sets the foregroud color for matches [default: green]
     -f, --format <format>
-            Specifies the out format for the picked hint. (%U: Upcase, %H: Hint) [default: %H]
+            Specifies the out format for the picked hint. (%U: Upcase, %P: Pattern, %H: Hint) [default: %H]
 
         --hint-bg-color <hint_background_color>        Sets the background color for hints [default: black]
         --hint-fg-color <hint_foreground_color>        Sets the foregroud color for hints [default: yellow]
