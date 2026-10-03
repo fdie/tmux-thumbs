@@ -30,7 +30,7 @@ pub struct Alphabet<'a> {
 }
 
 impl<'a> Alphabet<'a> {
-  fn new(letters: &'a str) -> Alphabet {
+  fn new(letters: &'a str) -> Alphabet<'a> {
     Alphabet { letters }
   }
 
@@ -64,7 +64,7 @@ impl<'a> Alphabet<'a> {
   }
 }
 
-pub fn get_alphabet(alphabet_name: &str) -> Alphabet {
+pub fn get_alphabet(alphabet_name: &str) -> Alphabet<'_> {
   let alphabets: HashMap<&str, &str> = ALPHABETS.iter().cloned().collect();
 
   alphabets
