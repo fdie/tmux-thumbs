@@ -136,6 +136,11 @@ fn app_args<'a>() -> clap::ArgMatches<'a> {
         .short("c"),
     )
     .arg(
+      Arg::with_name("mask")
+        .help("Mask everything but the matched zones")
+        .long("mask"),
+    )
+    .arg(
       Arg::with_name("target")
         .help("Stores the hint in the specified path")
         .long("target")
@@ -155,6 +160,7 @@ fn main() {
   let reverse = args.is_present("reverse");
   let unique = args.is_present("unique");
   let contrast = args.is_present("contrast");
+  let mask = args.is_present("mask");
   let regexp = if let Some(items) = args.values_of("regexp") {
     items.collect::<Vec<_>>()
   } else {
@@ -188,6 +194,7 @@ fn main() {
       reverse,
       unique,
       contrast,
+      mask,
       position,
       select_foreground_color,
       select_background_color,

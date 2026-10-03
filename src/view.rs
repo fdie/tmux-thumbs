@@ -45,6 +45,7 @@ pub struct View<'a> {
   skip: usize,
   multi: bool,
   contrast: bool,
+  mask: bool,
   position: &'a str,
   matches: Vec<state::Match<'a>>,
   select_foreground_color: Box<dyn color::Color>,
@@ -70,6 +71,7 @@ impl<'a> View<'a> {
     reverse: bool,
     unique: bool,
     contrast: bool,
+    mask: bool,
     position: &'a str,
     select_foreground_color: Box<dyn color::Color>,
     select_background_color: Box<dyn color::Color>,
@@ -88,6 +90,7 @@ impl<'a> View<'a> {
       skip,
       multi,
       contrast,
+      mask,
       position,
       matches,
       select_foreground_color,
@@ -125,11 +128,15 @@ impl<'a> View<'a> {
   fn render(&self, stdout: &mut dyn Write, typed_hint: &str) -> () {
     write!(stdout, "{}", cursor::Hide).unwrap();
 
-    for (index, line) in self.state.lines.iter().enumerate() {
-      let clean = line.trim_end_matches(|c: char| c.is_whitespace());
+    // With `mask`, everything that isn't a match stays blank: only the matched
+    // zones (redrawn below at their own position) are visible.
+    if !self.mask {
+      for (index, line) in self.state.lines.iter().enumerate() {
+        let clean = line.trim_end_matches(|c: char| c.is_whitespace());
 
-      if !clean.is_empty() {
-        print!("{goto}{text}", goto = cursor::Goto(1, index as u16 + 1), text = line);
+        if !clean.is_empty() {
+          print!("{goto}{text}", goto = cursor::Goto(1, index as u16 + 1), text = line);
+        }
       }
     }
 
@@ -362,6 +369,7 @@ mod tests {
       skip: 0,
       multi: false,
       contrast: false,
+      mask: false,
       position: &"",
       matches: vec![],
       select_foreground_color: colors::get_color("default"),
@@ -389,7 +397,10 @@ mod tests {
     let custom = [].to_vec();
     let state = state::State::new(&lines, "abcd", &custom, None);
     let matches = state.matches(false, false);
-    let mat = matches.iter().find(|m| m.text == "scripts/xmpp").expect("match not found");
+    let mat = matches
+      .iter()
+      .find(|m| m.text == "scripts/xmpp")
+      .expect("match not found");
     let line = &lines[mat.y as usize];
     let prefix = &line[0..mat.x as usize];
 

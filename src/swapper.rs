@@ -255,7 +255,7 @@ impl<'a> Swapper<'a> {
           let name = captures.get(1).unwrap().as_str();
           let value = captures.get(2).unwrap().as_str();
 
-          let boolean_params = vec!["reverse", "unique", "contrast"];
+          let boolean_params = vec!["reverse", "unique", "contrast", "mask"];
 
           if boolean_params.iter().any(|&x| x == name) {
             return vec![format!("--{}", name)];

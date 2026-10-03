@@ -105,6 +105,7 @@ NOTE: for changes to take effect, you'll need to source again your `.tmux.conf` 
 * [@thumbs-multi-fg-color](#thumbs-multi-fg-color)
 * [@thumbs-multi-bg-color](#thumbs-multi-bg-color)
 * [@thumbs-contrast](#thumbs-contrast)
+* [@thumbs-mask](#thumbs-mask)
 * [@thumbs-osc52](#thumbs-osc52)
 * [@thumbs-cursor-word](#thumbs-cursor-word)
 
@@ -321,6 +322,20 @@ For example:
 set -g @thumbs-multi-bg-color red
 ```
 
+### @thumbs-mask
+
+`default: disabled`
+
+Show only the matched zones and mask everything else.
+
+Like `@thumbs-unique`, any value enables it; unset the option to disable it.
+
+For example:
+
+```
+set -g @thumbs-mask enabled
+```
+
 ### @thumbs-contrast
 
 `default: 0`
@@ -462,6 +477,7 @@ USAGE:
 
 FLAGS:
     -c, --contrast    Put square brackets around hint for visibility
+        --mask        Mask everything but the matched zones
     -h, --help        Prints help information
     -m, --multi       Enable multi-selection
     -r, --reverse     Reverse the order for assigned hints
